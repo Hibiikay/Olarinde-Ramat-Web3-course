@@ -1,0 +1,38 @@
+function buildTable(data) {
+  let table = document.createElement("table");
+
+  // 1. Get column names from the first object's keys
+  let fields = Object.keys(data[0]);
+
+  // 2. Create the header row
+  let headRow = document.createElement("tr");
+  for (let field of fields) {
+    let headCell = document.createElement("th");
+    headCell.textContent = field;
+    headRow.appendChild(headCell);
+  }
+  table.appendChild(headRow);
+
+  // 3. Create a row for each object in the dataset
+  for (let object of data) {
+    let row = document.createElement("tr");
+    for (let field of fields) {
+      let cell = document.createElement("td");
+      let val = object[field];
+      cell.textContent = val;
+
+      // 4. Right-align cells containing numbers
+      if (typeof val === "number") {
+        cell.style.textAlign = "right";
+      }
+
+      row.appendChild(cell);
+    }
+    table.appendChild(row);
+  }
+
+  return table;
+}
+
+// Append the table to the element with id "mountains"
+document.querySelector("#mountains").appendChild(buildTable(MOUNTAINS));
