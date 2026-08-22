@@ -1,1 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gas Fee Calculator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <section class="card">
+      <div class="badge">⛽ Ethereum</div>
+      <h1>Gas Fee Calculator</h1>
+      <p class="subtitle">Estimate the network fee for an Ethereum transaction.</p>
 
+      <div class="form-group">
+        <label for="gasLimit">Gas Limit</label>
+        <div class="input-wrap">
+          <input id="gasLimit" type="number" min="0" step="1" value="21000" placeholder="e.g. 21000">
+          <span>gas</span>
+        </div>
+        <small>Standard ETH transfer: 21,000 gas</small>
+      </div>
+
+      <div class="form-group">
+        <label for="gasPrice">Gas Price</label>
+        <div class="input-wrap">
+          <input id="gasPrice" type="number" min="0" step="0.01" value="20" placeholder="e.g. 20">
+          <span>Gwei</span>
+        </div>
+      </div>
+
+      <div class="result">
+        <div class="result-label">Estimated Fee</div>
+        <div class="eth-fee"><span id="ethFee">0.00042000</span> ETH</div>
+        <div class="gwei-fee"><span id="gweiFee">8,400,000</span> Gwei</div>
+      </div>
+
+      <div class="formula">
+        <strong>Formula</strong>
+        <span>Gas Limit × Gas Price = Fee</span>
+      </div>
+
+      <button id="resetBtn" type="button">Reset to 21,000 gas</button>
+    </section>
+
+    <p class="footer">This is an estimate. Actual transaction fees can vary.</p>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
