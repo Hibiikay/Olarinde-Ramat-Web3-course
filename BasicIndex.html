@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>On-Chain Reader</title>
+</head>
+<body>
+
+    <h1>On-Chain Reader</h1>
+
+    <p>
+        <strong>Network:</strong>
+        <span id="network">Connecting...</span>
+    </p>
+
+    <p>
+        <strong>Current Block:</strong>
+        <span id="blockNumber">Loading...</span>
+    </p>
+
+    <p>
+        <strong>Wallet Address:</strong>
+        <span id="walletAddress">Loading...</span>
+    </p>
+
+    <p>
+        <strong>ETH Balance:</strong>
+        <span id="balance">Loading...</span>
+    </p>
+
+    <p id="status"></p>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
+    <script>
+        // Public Ethereum RPC endpoint
+        const RPC_URL = "https://ethereum-rpc.publicnode.com";
+
+        // Wallet address to check
+        const walletAddress =
+            "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
+
+        async function readBlockchain() {
+            try {
+                // Connect to Ethereum provider
+                const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+
+                // Get network information
+                const network = await provider.getNetwork();
+                document.getElementById("network").textContent =
+                    network.name + " (Chain ID: " + network.chainId + ")";
+
+                // Get current block number
+                const blockNumber = await provider.getBlockNumber();
+                document.getElementById("blockNumber").textContent =
+                    blockNumber;
+
+                // Display wallet address
+                document.getElementById("walletAddress").textContent =
+                    walletAddress;
+
+                // Get wallet ETH balance
+                const balanceWei =
+                    await provider.getBalance(walletAddress);
+
+                // Convert Wei to ETH
+                const balanceEth =
+                    ethers.utils.formatEther(balanceWei);
+
+                document.getElementById("balance").textContent =
+                    balanceEth + " ETH";
+
+                document.getElementById("status").textContent =
+                    "Successfully connected to Ethereum.";
+
+            } catch (error) {
+                console.error(error);
+
+                document.getElementById("status").textContent =
+                    "Error connecting to the Ethereum network.";
+            }
+        }
+
+        // Run the function
+        readBlockchain();
+    </script>
+
+</body>
+</html>
