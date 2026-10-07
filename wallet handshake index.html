@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>The Wallet Handshake</title>
+
+  <!-- Ethers.js v5 -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      color: #1f2937;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 500px;
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #6b7280;
+      margin-bottom: 25px;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .info {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+
+    .info p {
+      margin: 8px 0;
+    }
+
+    #message {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      display: none;
+      word-break: break-word;
+    }
+
+    .success {
+      display: block !important;
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .error {
+      display: block !important;
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .warning {
+      display: block !important;
+      background: #fef3c7;
+      color: #92400e;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>🔐 The Wallet Handshake</h1>
+
+    <p class="subtitle">
+      Connect your MetaMask wallet on the Sepolia testnet.
+    </p>
+
+    <button id="connectButton">
+      Connect Wallet
+    </button>
+
+    <div class="info">
+      <p>
+        <strong>Network:</strong>
+        <span id="network">Not connected</span>
+      </p>
+
+      <p>
+        <strong>Wallet:</strong>
+        <span id="wallet">Not connected</span>
+      </p>
+
+      <p>
+        <strong>Balance:</strong>
+        <span id="balance">-- ETH</span>
+      </p>
+    </div>
+
+    <button id="sendButton" disabled>
+      Send 0.001 ETH
+    </button>
+
+    <div id="message"></div>
+
+  </div>
+
+  <script>
+
+    // --------------------------------------------------
+    // SETTINGS
+    // --------------------------------------------------
+
+    // Sepolia Chain ID
+    const SEPOLIA_CHAIN_ID = 11155111;
+
+    // Hardcoded recipient address.
+    // Replace this with your own second Sepolia test wallet.
+    const RECIPIENT_ADDRESS =
+      "0xB0f326bB3602b0A342cfd148B4e72cB524802028";
+
+
+    // --------------------------------------------------
+    // VARIABLES
+    // --------------------------------------------------
+
+    let provider;
+    let signer;
+    let walletAddress;
+
+
+    // --------------------------------------------------
+    // DOM ELEMENTS
+    // --------------------------------------------------
+
+    const connectButton = document.getElementById("connectButton");
+    const sendButton = document.getElementById("sendButton");
+
+    const walletDisplay = document.getElementById("wallet");
+    const balanceDisplay = document.getElementById("balance");
+    const networkDisplay = document.getElementById("network");
+
+    const message = document.getElementById("message");
+
+
+    // --------------------------------------------------
+    // DISPLAY MESSAGE
+    // --------------------------------------------------
+
+    function showMessage(text, type) {
+
+      message.textContent = text;
+
+      message.className = "";
+
+      message.classList.add(type);
+
+    }
+
+
+    // --------------------------------------------------
+    // CHECK SEPOLIA NETWORK
+    // --------------------------------------------------
+
+    async function checkNetwork() {
+
+      const network = await provider.getNetwork();
+
+      if (network.chainId !== SEPOLIA_CHAIN_ID) {
+
+        networkDisplay.textContent = "Wrong network";
+
+        showMessage(
+          "Please switch MetaMask to the Sepolia testnet.",
+          "warning"
+        );
+
+        sendButton.disabled = true;
+
+        return false;
+      }
+
+      networkDisplay.textContent = "Sepolia";
+
+      return true;
+    }
+
+
+    // --------------------------------------------------
+    // CONNECT WALLET
+    // --------------------------------------------------
+
+    async function connectWallet() {
+
+      try {
+
+        // Check if MetaMask exists
+        if (!window.ethereum) {
+
+          showMessage(
+            "MetaMask was not detected. Please install MetaMask and try again.",
+            "error"
+          );
+
+          return;
+        }
+
+        // Create Ethers provider
+        provider = new ethers.providers.Web3Provider(
+          window.ethereum
+        );
+
+        // Request access to MetaMask accounts
+        await provider.send(
+          "eth_requestAccounts",
+          []
+        );
+
+        // Get the signer
+        signer = provider.getSigner();
+
+        // Get the signer's address
+        walletAddress = await signer.getAddress();
+
+        // Display wallet address
+        walletDisplay.textContent = walletAddress;
+
+        // Check network
+        const correctNetwork = await checkNetwork();
+
+        if (!correctNetwork) {
+          return;
+        }
+
+        // Get balance using the SIGNER
+        const balance = await signer.getBalance();
+
+        // Convert Wei to ETH
+        const formattedBalance =
+          ethers.utils.formatEther(balance);
+
+        balanceDisplay.textContent =
+          `${formattedBalance} ETH`;
+
+        // Enable transaction button
+        sendButton.disabled = false;
+
+        connectButton.textContent = "Wallet Connected";
+
+        showMessage(
+          "Wallet connected successfully!",
+          "success"
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+        // User rejected MetaMask connection
+        if (error.code === 4001) {
+
+          showMessage(
+            "Connection cancelled. You rejected the MetaMask request.",
+            "error"
+          );
+
+        } else {
+
+          showMessage(
+            "Unable to connect wallet. Please try again.",
+            "error"
+          );
+
+        }
+
+      }
+
+    }
+
+
+    // --------------------------------------------------
+    // SEND TRANSACTION
+    // --------------------------------------------------
+
+    async function sendTransaction() {
+
+      try {
+
+        if (!signer) {
+
+          showMessage(
+            "Please connect your wallet first.",
+            "error"
+          );
+
+          return;
+        }
+
+        // Make sure we're still on Sepolia
+        const correctNetwork = await checkNetwork();
+
+        if (!correctNetwork) {
+          return;
+        }
+
+        sendButton.disabled = true;
+
+        showMessage(
+          "Please confirm the transaction in MetaMask...",
+          "warning"
+        );
+
+        // Send 0.001 ETH
+        const transaction = await signer.sendTransaction({
+
+          to: RECIPIENT_ADDRESS,
+
+          value: ethers.utils.parseEther("0.001")
+
+        });
+
+        // Transaction submitted
+        showMessage(
+          `Transaction submitted! Hash: ${transaction.hash}`,
+          "success"
+        );
+
+        // Wait for confirmation
+        await transaction.wait();
+
+        showMessage(
+          `Transaction confirmed successfully! Transaction hash: ${transaction.hash}`,
+          "success"
+        );
+
+        // Update balance after transaction
+        const newBalance =
+          await signer.getBalance();
+
+        balanceDisplay.textContent =
+          `${ethers.utils.formatEther(newBalance)} ETH`;
+
+        sendButton.disabled = false;
+
+      } catch (error) {
+
+        console.error(error);
+
+        // User rejected transaction
+        if (error.code === 4001) {
+
+          showMessage(
+            "Transaction cancelled. You rejected the request in MetaMask.",
+            "error"
+          );
+
+        } else {
+
+          showMessage(
+            "Transaction failed. Please check your balance, network, and try again.",
+            "error"
+          );
+
+        }
+
+        sendButton.disabled = false;
+
+      }
+
+    }
+
+
+    // --------------------------------------------------
+    // BUTTON EVENTS
+    // --------------------------------------------------
+
+    connectButton.addEventListener(
+      "click",
+      connectWallet
+    );
+
+    sendButton.addEventListener(
+      "click",
+      sendTransaction
+    );
+
+
+    // --------------------------------------------------
+    // METAMASK ACCOUNT CHANGE
+    // --------------------------------------------------
+
+    if (window.ethereum) {
+
+      window.ethereum.on(
+        "accountsChanged",
+        function (accounts) {
+
+          if (accounts.length === 0) {
+
+            walletDisplay.textContent =
+              "Not connected";
+
+            balanceDisplay.textContent =
+              "-- ETH";
+
+            sendButton.disabled = true;
+
+            connectButton.textContent =
+              "Connect Wallet";
+
+            showMessage(
+              "Wallet disconnected.",
+              "warning"
+            );
+
+          } else {
+
+            // Refresh the page state
+            connectWallet();
+
+          }
+
+        }
+      );
+
+
+      // Detect network changes
+      window.ethereum.on(
+        "chainChanged",
+        function () {
+
+          window.location.reload();
+
+        }
+      );
+
+    }
+
+  </script>
+
+</body>
+</html>
