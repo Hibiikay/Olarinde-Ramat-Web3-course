@@ -1,0 +1,17 @@
+let url = "https://eloquentjavascript.net/author";
+let mediaTypes = [
+  "text/plain",
+  "text/html",
+  "application/json",
+  "application/rainbows+unicorns"
+];
+
+for (let type of mediaTypes) {
+  fetch(url, { headers: { Accept: type } })
+    .then(resp => {
+      console.log(`Media Type: ${type} -> Status: ${resp.status}`);
+      return resp.text();
+    })
+    .then(text => console.log(text.slice(0, 100))) // Preview content
+    .catch(err => console.log(`Error with ${type}:`, err));
+}
