@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Message Board</title>
+
+  <!-- Ethers.js v5 -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      background: #f4f7f6;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 550px;
+      background: white;
+      padding: 35px;
+      border-radius: 15px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 12px 18px;
+      cursor: pointer;
+      font-size: 15px;
+      background: #222;
+      color: white;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .wallet {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    #walletAddress {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #555;
+      word-break: break-all;
+    }
+
+    .message-box {
+      background: #f1f3f4;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .message-box h2 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    #currentMessage {
+      font-size: 22px;
+      font-weight: bold;
+      word-break: break-word;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    .set-button {
+      width: 100%;
+    }
+
+    #status {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f1f3f4;
+      font-size: 14px;
+      min-height: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>Message Board</h1>
+
+    <div class="wallet">
+      <button id="connectButton">
+        Connect Wallet
+      </button>
+
+      <div id="walletAddress"></div>
+    </div>
+
+    <div class="message-box">
+      <h2>Current Message</h2>
+
+      <div id="currentMessage">
+        Loading...
+      </div>
+    </div>
+
+    <input
+      type="text"
+      id="messageInput"
+      placeholder="Enter a new message"
+    >
+
+    <button
+      class="set-button"
+      id="setMessageButton"
+    >
+      Set Message
+    </button>
+
+    <div id="status"></div>
+
+  </div>
+
+
+  <script>
+
+    // ==========================================
+    // CONTRACT CONFIGURATION
+    // ==========================================
+
+    const CONTRACT_ADDRESS =
+      "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+    const CONTRACT_ABI = [
+      "function getMessage() view returns (string)",
+      "function setMessage(string)"
+    ];
+
+    const HARDHAT_CHAIN_ID = 31337;
+
+    const HARDHAT_RPC_URL =
+      "http://127.0.0.1:8545";
+
+
+    // ==========================================
+    // VARIABLES
+    // ==========================================
+
+    let provider;
+    let signer;
+    let contract;
+
+
+    // ==========================================
+    // PAGE ELEMENTS
+    // ==========================================
+
+    const connectButton =
+      document.getElementById("connectButton");
+
+    const walletAddress =
+      document.getElementById("walletAddress");
+
+    const currentMessage =
+      document.getElementById("currentMessage");
+
+    const messageInput =
+      document.getElementById("messageInput");
+
+    const setMessageButton =
+      document.getElementById("setMessageButton");
+
+    const status =
+      document.getElementById("status");
+
+
+    // ==========================================
+    // LOAD MESSAGE
+    // ==========================================
+
+    async function loadMessage() {
+
+      try {
+
+        const readProvider =
+          new ethers.providers.JsonRpcProvider(
+            HARDHAT_RPC_URL
+          );
+
+        const readContract =
+          new ethers.Contract(
+            CONTRACT_ADDRESS,
+            CONTRACT_ABI,
+            readProvider
+          );
+
+        const message =
+          await readContract.getMessage();
+
+        currentMessage.textContent =
+          message || "(No message yet)";
+
+      } catch (error) {
+
+        console.error(error);
+
+        currentMessage.textContent =
+          "Unable to load message.";
+
+        status.textContent =
+          "Make sure the Hardhat node is running.";
+
+      }
+    }
+
+
+    // ==========================================
+    // CONNECT WALLET
+    // ==========================================
+
+    async function connectWallet() {
+
+      try {
+
+        if (!window.ethereum) {
+
+          status.textContent =
+            "MetaMask is not installed.";
+
+          return;
+        }
+
+
+        provider =
+          new ethers.providers.Web3Provider(
+            window.ethereum
+          );
+
+
+        // Check current network
+        let network =
+          await provider.getNetwork();
+
+
+        // Switch to Hardhat
+        if (network.chainId !== HARDHAT_CHAIN_ID) {
+
+          try {
+
+            await window.ethereum.request({
+              method: "wallet_switchEthereumChain",
+
+              params: [
+                {
+                  chainId: "0x7A69"
+                }
+              ]
+            });
+
+          } catch (switchError) {
+
+            // Network doesn't exist in MetaMask
+            if (switchError.code === 4902) {
+
+              await window.ethereum.request({
+
+                method:
+                  "wallet_addEthereumChain",
+
+                params: [
+                  {
+                    chainId: "0x7A69",
+
+                    chainName:
+                      "Hardhat Localhost",
+
+                    nativeCurrency: {
+                      name: "Ether",
+                      symbol: "ETH",
+                      decimals: 18
+                    },
+
+                    rpcUrls: [
+                      HARDHAT_RPC_URL
+                    ]
+                  }
+                ]
+
+              });
+
+            } else {
+
+              throw switchError;
+
+            }
+          }
+
+
+          provider =
+            new ethers.providers.Web3Provider(
+              window.ethereum
+            );
+        }
+
+
+        // Ask MetaMask for permission
+        await provider.send(
+          "eth_requestAccounts",
+          []
+        );
+
+
+        signer =
+          provider.getSigner();
+
+
+        const address =
+          await signer.getAddress();
+
+
+        walletAddress.textContent =
+          "Connected: " + address;
+
+
+        contract =
+          new ethers.Contract(
+            CONTRACT_ADDRESS,
+            CONTRACT_ABI,
+            signer
+          );
+
+
+        status.textContent =
+          "Wallet connected successfully.";
+
+      } catch (error) {
+
+        if (error.code === 4001) {
+
+          status.textContent =
+            "Wallet connection was cancelled in MetaMask.";
+
+        } else {
+
+          status.textContent =
+            "Unable to connect wallet.";
+
+        }
+      }
+    }
+
+
+    // ==========================================
+    // SET MESSAGE
+    // ==========================================
+
+    async function setMessage() {
+
+      if (!contract) {
+
+        status.textContent =
+          "Please connect your MetaMask wallet first.";
+
+        return;
+      }
+
+
+      const newMessage =
+        messageInput.value.trim();
+
+
+      if (!newMessage) {
+
+        status.textContent =
+          "Please enter a message.";
+
+        return;
+      }
+
+
+      try {
+
+        status.textContent =
+          "Waiting for MetaMask confirmation...";
+
+
+        const transaction =
+          await contract.setMessage(
+            newMessage
+          );
+
+
+        status.textContent =
+          "Transaction submitted. Waiting for confirmation...";
+
+
+        await transaction.wait();
+
+
+        currentMessage.textContent =
+          newMessage;
+
+
+        messageInput.value = "";
+
+
+        status.textContent =
+          "Message updated successfully!";
+
+      } catch (error) {
+
+        if (
+          error.code === 4001 ||
+          error.code === "ACTION_REJECTED"
+        ) {
+
+          status.textContent =
+            "Transaction was cancelled in MetaMask.";
+
+        } else {
+
+          console.error(error);
+
+          status.textContent =
+            "Transaction failed. Please try again.";
+
+        }
+      }
+    }
+
+
+    // ==========================================
+    // BUTTON EVENTS
+    // ==========================================
+
+    connectButton.addEventListener(
+      "click",
+      connectWallet
+    );
+
+
+    setMessageButton.addEventListener(
+      "click",
+      setMessage
+    );
+
+
+    // ==========================================
+    // LOAD MESSAGE ON PAGE LOAD
+    // ==========================================
+
+    loadMessage();
+
+  </script>
+
+</body>
+</html>
