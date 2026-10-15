@@ -1,0 +1,317 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ajo Savings DApp</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.5/ethers.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: #f3f7f4;
+      color: #183b2b;
+    }
+    main {
+      max-width: 720px;
+      margin: 30px auto;
+      padding: 28px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 8px 28px #153b2b12;
+    }
+    h1 { margin-top: 0; }
+    .subtitle { color: #60756a; line-height: 1.6; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 24px 0;
+    }
+    .item {
+      padding: 18px;
+      border-radius: 12px;
+      background: #f0f7f1;
+      overflow-wrap: anywhere;
+    }
+    .label { font-size: 13px; color: #60756a; }
+    .value { margin-top: 9px; font-weight: bold; font-size: 18px; }
+    button {
+      padding: 13px 18px;
+      border: 0;
+      border-radius: 9px;
+      background: #177245;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .secondary { background: #e5eee8; color: #183b2b; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    #wallet, #status { margin: 16px 0; overflow-wrap: anywhere; }
+    #status { line-height: 1.5; }
+    .small { font-size: 12px; color: #60756a; overflow-wrap: anywhere; }
+    @media (max-width: 500px) {
+      body { padding: 10px; }
+      main { padding: 18px; margin: 10px auto; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🌱 Ajo Savings</h1>
+  <p class="subtitle">
+    A rotating savings group for three members. Each member contributes
+    the same amount every round, and the recipient changes automatically.
+  </p>
+
+  <div class="actions">
+    <button id="connectBtn">Connect MetaMask</button>
+    <button id="refreshBtn" class="secondary">Refresh details</button>
+  </div>
+
+  <p id="wallet">Wallet not connected.</p>
+  <p id="status" role="status">Connect your wallet to get started.</p>
+
+  <section class="grid">
+    <div class="item">
+      <div class="label">Current round</div>
+      <div class="value" id="round">—</div>
+    </div>
+    <div class="item">
+      <div class="label">Contribution per member</div>
+      <div class="value" id="amount">—</div>
+    </div>
+    <div class="item">
+      <div class="label">Current recipient</div>
+      <div class="value" id="recipient">—</div>
+    </div>
+    <div class="item">
+      <div class="label">Contributions this round</div>
+      <div class="value" id="count">—</div>
+    </div>
+    <div class="item">
+      <div class="label">Current pot balance</div>
+      <div class="value" id="pot">—</div>
+    </div>
+    <div class="item">
+      <div class="label">Your contribution status</div>
+      <div class="value" id="memberStatus">—</div>
+    </div>
+  </section>
+
+  <button id="contributeBtn" disabled>Contribute 0.001 ETH</button>
+
+  <p class="small">
+    Network: Ethereum Sepolia. Test ETH only.
+  </p>
+  <p class="small">
+    Contract:
+    <a href="https://sepolia.etherscan.io/address/0xE8E009ac769747565E1006B4d05F36d88488cb2E"
+       target="_blank" rel="noopener noreferrer">View on Sepolia Etherscan</a>
+  </p>
+</main>
+
+<script>
+  const CONTRACT_ADDRESS =
+    "0xE8E009ac769747565E1006B4d05F36d88488cb2E";
+
+  const SEPOLIA_CHAIN_ID = "0xaa36a7";
+
+  const ABI = [
+    "function contribute() payable",
+    "function getCurrentRecipient() view returns (address)",
+    "function getPotBalance() view returns (uint256)",
+    "function contributionAmount() view returns (uint256)",
+    "function currentRound() view returns (uint256)",
+    "function contributionsCount() view returns (uint256)",
+    "function hasContributed(address) view returns (bool)",
+    "function isMember(address) view returns (bool)"
+  ];
+
+  let provider;
+  let signer;
+  let contract;
+  let account;
+
+  const $ = id => document.getElementById(id);
+
+  function status(message) {
+    $("status").textContent = message;
+  }
+
+  function shortAddress(address) {
+    return address
+      ? address.slice(0, 6) + "..." + address.slice(-4)
+      : "—";
+  }
+
+  async function ensureSepolia() {
+    const chainId = await window.ethereum.request({
+      method: "eth_chainId"
+    });
+
+    if (chainId !== SEPOLIA_CHAIN_ID) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: SEPOLIA_CHAIN_ID }]
+        });
+      } catch (error) {
+        if (error.code === 4902) {
+          throw new Error(
+            "Sepolia is not configured in MetaMask. Add the Sepolia network first."
+          );
+        }
+        throw error;
+      }
+    }
+  }
+
+  async function connectWallet() {
+    if (!window.ethereum) {
+      throw new Error("MetaMask was not detected. Open this page in a browser with MetaMask.");
+    }
+
+    await ensureSepolia();
+
+    await window.ethereum.request({
+      method: "eth_requestAccounts"
+    });
+
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    account = await signer.getAddress();
+
+    contract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      ABI,
+      signer
+    );
+
+    $("wallet").textContent = "Connected wallet: " + account;
+    $("connectBtn").textContent = "Wallet connected";
+
+    await refreshDetails();
+  }
+
+  async function refreshDetails() {
+    if (!contract || !account) {
+      status("Connect your MetaMask wallet first.");
+      return;
+    }
+
+    try {
+      const [
+        round,
+        amount,
+        recipient,
+        count,
+        pot,
+        member,
+        contributed
+      ] = await Promise.all([
+        contract.currentRound(),
+        contract.contributionAmount(),
+        contract.getCurrentRecipient(),
+        contract.contributionsCount(),
+        contract.getPotBalance(),
+        contract.isMember(account),
+        contract.hasContributed(account)
+      ]);
+
+      $("round").textContent = round.toString();
+      $("amount").textContent = ethers.formatEther(amount) + " ETH";
+      $("recipient").textContent = shortAddress(recipient);
+      $("recipient").title = recipient;
+      $("count").textContent = count.toString() + " / 3";
+      $("pot").textContent = ethers.formatEther(pot) + " ETH";
+
+      $("memberStatus").textContent = !member
+        ? "Not a member"
+        : contributed
+          ? "Already contributed"
+          : "Contribution pending";
+
+      $("contributeBtn").disabled = !member || contributed;
+
+      status(
+        !member
+          ? "This wallet is not one of the three registered members."
+          : contributed
+            ? "Your contribution for this round has been recorded."
+            : "You can contribute when ready."
+      );
+    } catch (error) {
+      console.error(error);
+      status("Could not read contract details. Check your network and contract address.");
+    }
+  }
+
+  async function contribute() {
+    if (!contract) {
+      status("Connect MetaMask first.");
+      return;
+    }
+
+    $("contributeBtn").disabled = true;
+
+    try {
+      await ensureSepolia();
+
+      status("Please confirm the contribution in MetaMask.");
+
+      const amount = await contract.contributionAmount();
+
+      const tx = await contract.contribute({
+        value: amount
+      });
+
+      status("Transaction submitted. Waiting for confirmation...");
+
+      await tx.wait();
+
+      status("Contribution confirmed! Updating the savings group...");
+      await refreshDetails();
+    } catch (error) {
+      console.error(error);
+
+      if (error.code === 4001 ||
+          error.code === "ACTION_REJECTED") {
+        status("Transaction cancelled in MetaMask.");
+      } else {
+        status(
+          error.shortMessage ||
+          error.reason ||
+          error.message ||
+          "Transaction failed."
+        );
+      }
+
+      await refreshDetails();
+    }
+  }
+
+  $("connectBtn").addEventListener("click", async () => {
+    try {
+      await connectWallet();
+    } catch (error) {
+      console.error(error);
+      status(error.shortMessage || error.message || "Could not connect wallet.");
+    }
+  });
+
+  $("refreshBtn").addEventListener("click", refreshDetails);
+  $("contributeBtn").addEventListener("click", contribute);
+
+  if (window.ethereum) {
+    window.ethereum.on("accountsChanged", () => location.reload());
+    window.ethereum.on("chainChanged", () => location.reload());
+  }
+</script>
+</body>
+</html>
